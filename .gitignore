@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.DS_Store
+
+# Spotify PKCE tokens — local credential, never commit
+runtime/
+spotify-*.json
+*.token.json
+
+# Runtime / editor / venv artefacts
+*.swp
+.venv/
+build/
+notes.md
+notes.txt
