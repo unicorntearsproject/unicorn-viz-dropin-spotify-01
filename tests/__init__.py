@@ -1,0 +1,1 @@
+"""Spotify controller test suite."""
