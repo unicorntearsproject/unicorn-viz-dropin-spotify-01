@@ -79,3 +79,19 @@ Accepted feature keys are canonicalized automatically. Use either:
   }
 }
 ```
+
+## Populating The Corpus
+
+The corpus is not generated automatically. Use the exporter script to merge
+Spotify audio features for tracks you already played:
+
+```bash
+python tools/export_audio_features.py logs/autovj-20260618T160744.jsonl \
+  --token-store runtime/spotify-token.json \
+  --features-file assets/audio/spotify_features.json
+```
+
+You can pass one or more Auto VJ log files or directories. The script extracts
+canonical track IDs from `effect_swap` entries, calls Spotify's `GET /audio-features`
+endpoint in batches of up to 100 IDs, and merges the returned rows into the
+corpus JSON.

@@ -14,11 +14,11 @@ Last updated: 2026-06-05
 
 - `spotify-01` is not currently a Windows-native backend.
 - The current implementation shells out to `playerctl`, which expects an
-	MPRIS-compatible media player session.
+  MPRIS-compatible media player session.
 - On Windows, that means there is no single missing package to install and be
-	done; the missing piece is a Windows media-session backend implementation.
+  done; the missing piece is a Windows media-session backend implementation.
 - For Windows today, prefer `[spotify.web_api]` if authenticated Spotify Web API
-	data satisfies the use case.
+  data satisfies the use case.
 
 ## Web API Auth Not Ready
 
@@ -44,3 +44,5 @@ Last updated: 2026-06-05
 - Ensure path exists and JSON is valid.
 - Keys are canonicalized automatically, but the safest form is `spotify:track:<id>`.
 - The controller also accepts raw MPRIS ids such as `/com/spotify/track/<id>`.
+- If the file is still empty, populate it with `tools/export_audio_features.py`
+  against your Auto VJ logs and authenticated token store.
