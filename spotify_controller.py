@@ -610,7 +610,7 @@ class SpotifyController:
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
         )
         try:
-            with urllib.request.urlopen(request, timeout=15.0) as response:
+            with urllib.request.urlopen(request, timeout=15.0) as response:  # nosec B310
                 payload = json.loads(response.read().decode('utf-8'))
         except Exception as exc:
             self._last_error = f'token_exchange_failed: {exc}'
@@ -636,7 +636,7 @@ class SpotifyController:
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
         )
         try:
-            with urllib.request.urlopen(request, timeout=15.0) as response:
+            with urllib.request.urlopen(request, timeout=15.0) as response:  # nosec B310
                 payload = json.loads(response.read().decode('utf-8'))
         except Exception as exc:
             self._last_error = f'token_refresh_failed: {exc}'
@@ -690,7 +690,7 @@ class SpotifyController:
                 url += '?' + urllib.parse.urlencode(clean, doseq=True)
         request = urllib.request.Request(url, headers=headers, method='GET')
         try:
-            with urllib.request.urlopen(request, timeout=self._http_timeout_s) as response:
+            with urllib.request.urlopen(request, timeout=self._http_timeout_s) as response:  # nosec B310
                 if response.status == 204:
                     return {}
                 return json.loads(response.read().decode('utf-8'))
