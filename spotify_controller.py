@@ -1030,6 +1030,8 @@ class SpotifyController:
                 pass
             try:
                 danceability, _ = es.Danceability()(samples)
+                # Clamp to [0,1] range - essentia sometimes returns values > 1.0
+                danceability = float(np.clip(danceability, 0.0, 1.0))
             except Exception:
                 pass
             try:
