@@ -2,7 +2,7 @@
 
 Owner: Drop-in Maintainers
 Status: active
-Last updated: 2026-05-24
+Last updated: 2026-06-18
 
 ```toml
 [spotify]
@@ -41,7 +41,8 @@ resolve_playlist_context = true
 - `command_timeout_s`: Per-command timeout guard in seconds.
 - `now_playing_banner`: Enables the top-pinned track-change banner.
 - `now_playing_banner_hold_s`: Time in seconds before the banner slides out.
-- `features_file`: Optional JSON map keyed by Spotify track id with feature payload.
+- `features_file`: Optional JSON map keyed by Spotify track id with locally
+  generated feature payload.
 
 ## Web API Keys
 
@@ -80,18 +81,31 @@ Accepted feature keys are canonicalized automatically. Use either:
 }
 ```
 
-## Populating The Corpus
+## Local Feature Corpus
 
-The corpus is not generated automatically. Use the exporter script to merge
-Spotify audio features for tracks you already played:
+The optional `features_file` is a local training artifact, not a runtime
+dependency. Keep the file in a private training workspace or generate it from
+an offline analysis pipeline, then point `[spotify].features_file` at the
+result if you want runtime feature hints.
 
-```bash
-python tools/export_audio_features.py logs/autovj-20260618T160744.jsonl \
-  --token-store runtime/spotify-token.json \
-  --features-file assets/audio/spotify_features.json
-```
+The optional live corpus sink writes runtime rows directly when
+`[spotify].live_corpus_file` is configured. This is the path to use if you
+want training data while a set is running.
 
-You can pass one or more Auto VJ log files or directories. The script extracts
-canonical track IDs from `effect_swap` entries, calls Spotify's `GET /audio-features`
-endpoint in batches of up to 100 IDs, and merges the returned rows into the
-corpus JSON.
+For Auto VJ training, the usual path is:
+
+1. Capture Auto VJ logs with Spotify metadata enabled.
+2. Resolve each Spotify track id against a local audio catalog.
+3. Run `tools/training/sync_corpus_from_logs.py` to extract Essentia features
+  into the corpus.
+4. Train or refresh the weight file from that corpus.
+
+If you want the corpus to keep filling while a set is running, configure
+`[spotify].live_corpus_file` and keep the local audio catalog mounted.
+
+The logs can carry Spotify title/artist/album/source fields, which helps the
+training sync resolve tracks even when the catalog is keyed by metadata rather
+than track id.
+
+The live Spotify runtime no longer depends on Spotify's deprecated audio-
+features endpoints.

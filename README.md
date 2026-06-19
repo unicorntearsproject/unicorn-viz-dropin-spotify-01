@@ -15,7 +15,8 @@ mode is the cross-platform path for queue, playlist, and auth-aware context.
 
 - Track metadata snapshot (`track_id`, title, artist, album, status)
 - Playback timing (`duration_s`, `position_s`, progress)
-- Optional per-track feature map (`bpm`, `energy`, `danceability`, `valence`)
+- Optional per-track feature map from a local training corpus
+  (`bpm`, `energy`, `danceability`, `valence`)
 - Top-pinned now-playing banner for new tracks when enabled in config
 - Optional PKCE auth, playback context, queue, and playlist metadata via
 	Spotify Web API

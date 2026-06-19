@@ -137,20 +137,26 @@ def sample_features_data() -> dict[str, Any]:
     """Provide sample track features data."""
     return {
         'spotify:track:track123': {
+            'tempo': 120.0,
             'bpm': 120.0,
             'energy': 0.85,
             'danceability': 0.72,
             'valence': 0.68,
             'confidence': 0.92,
+            'key': 'C',
+            'mode': 'minor',
             'tags': ['upbeat', 'electronic', 'dance'],
             'genres': ['house', 'electronic', 'dance pop'],
         },
         'spotify:track:track456': {
+            'tempo': 95.0,
             'bpm': 95.0,
             'energy': 0.65,
             'danceability': 0.58,
             'valence': 0.55,
             'confidence': 0.88,
+            'key': 'G',
+            'mode': 'major',
             'tags': ['chill', 'ambient'],
             'genres': ['indie', 'alternative'],
         },

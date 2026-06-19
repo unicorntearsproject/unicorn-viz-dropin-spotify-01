@@ -23,7 +23,9 @@ import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
+
+import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -129,6 +131,8 @@ class SpotifyController:
         self._features_path = self._resolve_features_path(self._cfg.get('features_file'))
         self._features_mtime_ns: int = -1
         self._features_cache: dict[str, dict[str, Any]] = {}
+        self._live_corpus_path = self._resolve_features_path(self._cfg.get('live_corpus_file'))
+        self._live_corpus_last_signature = ''
 
         self._last_poll_t: float = -1e9
         self._available: bool = False
@@ -236,6 +240,21 @@ class SpotifyController:
             self._update_local(dt)
         if self._web_enabled:
             self._update_web_api()
+        # Live corpus capture moved to Auto VJ's per-beat sequence writer.
+        # The append-per-5s bucket logic here is replaced by musical-time
+        # heartbeat + event keyframes. See training-capture-strategy.md.
+        # if self._live_corpus_path is not None:
+        #     runtime_sample_fn = getattr(self._app, 'build_live_corpus_sample', None)
+        #     runtime_fields: Mapping[str, Any] | None = None
+        #     if callable(runtime_sample_fn):
+        #         try:
+        #             runtime_fields = runtime_sample_fn()
+        #         except Exception:
+        #             runtime_fields = None
+        #     try:
+        #         self.record_live_corpus_snapshot(self.snapshot(), runtime_fields)
+        #     except Exception:
+        #         log.exception('Spotify live corpus write failed')
 
     def _update_local(self, dt: float) -> None:
         """Refresh local MPRIS/playerctl metadata."""
@@ -827,6 +846,265 @@ class SpotifyController:
                 continue
             rows[self._canonical_track_id(key)] = value
         self._features_cache = rows
+
+    def record_live_corpus_snapshot(
+        self,
+        snapshot: Mapping[str, Any],
+        runtime_fields: Mapping[str, Any] | None = None,
+    ) -> bool:
+        """Append a live merged Spotify/VJ/stream sample to the configured corpus file."""
+
+        path = self._live_corpus_path
+        if path is None or not isinstance(snapshot, Mapping):
+            return False
+
+        track_id = self._canonical_track_id(str(snapshot.get('track_id', '') or ''))
+        if not track_id:
+            return False
+
+        position_s = max(0.0, float(snapshot.get('position_s', 0.0) or 0.0))
+        change_counter = int(snapshot.get('change_counter', 0) or 0)
+        bucket_s = 5.0
+        bucket = int(position_s // bucket_s)
+        effect_name = ''
+        if runtime_fields is not None:
+            effect_name = str(runtime_fields.get('vj_effect', '') or '').strip().lower()
+        signature = f'{track_id}:{change_counter}:{bucket}:{effect_name}'
+        if signature == self._live_corpus_last_signature:
+            return False
+
+        stream_window = None
+        stream_rate = 0
+        stream_features: dict[str, Any] = {}
+        live_audio_fn = getattr(self._app, 'get_live_audio_window', None)
+        if callable(live_audio_fn):
+            try:
+                stream_window = live_audio_fn()
+            except Exception:
+                stream_window = None
+        if isinstance(stream_window, tuple) and len(stream_window) == 2:
+            pcm, stream_rate = stream_window
+            if isinstance(pcm, np.ndarray) and pcm.size > 0 and stream_rate > 0:
+                stream_features = self._extract_live_audio_features(pcm, int(stream_rate))
+
+        features = self._feature_payload(track_id)
+        row: dict[str, Any] = {}
+        for key in (
+            'track_id',
+            'title',
+            'artist',
+            'album',
+            'duration_s',
+            'position_s',
+            'progress',
+        ):
+            value = snapshot.get(key)
+            if value is not None:
+                row[key] = value
+
+        if stream_features:
+            row.update(stream_features)
+
+        spotify_bpm = features.get('tempo') if 'tempo' in features else features.get('bpm') if 'bpm' in features else None
+        spotify_key_value = features.get('key', '')
+        spotify_mode_value = features.get('mode', None)
+        spotify_key_names = ('C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B')
+        spotify_key_index = -1
+        spotify_key = ''
+        if isinstance(spotify_key_value, (int, np.integer)):
+            spotify_key_index = int(spotify_key_value)
+            if 0 <= spotify_key_index < len(spotify_key_names):
+                spotify_key = spotify_key_names[spotify_key_index]
+        else:
+            spotify_key_text = str(spotify_key_value).strip()
+            if spotify_key_text:
+                if spotify_key_text.isdigit():
+                    spotify_key_index = int(spotify_key_text)
+                    if 0 <= spotify_key_index < len(spotify_key_names):
+                        spotify_key = spotify_key_names[spotify_key_index]
+                else:
+                    spotify_key = spotify_key_text
+                    key_lookup = spotify_key.upper()
+                    for idx, key_name in enumerate(spotify_key_names):
+                        if key_name == key_lookup:
+                            spotify_key_index = idx
+                            break
+
+        spotify_is_minor: bool | None = None
+        if spotify_mode_value is not None:
+            if isinstance(spotify_mode_value, bool):
+                spotify_is_minor = not spotify_mode_value
+            else:
+                try:
+                    spotify_is_minor = int(spotify_mode_value) == 0
+                except Exception:
+                    mode_text = str(spotify_mode_value).strip().lower()
+                    if mode_text:
+                        spotify_is_minor = mode_text.startswith('minor')
+
+        if spotify_bpm is not None:
+            row['spotify_bpm'] = float(spotify_bpm or 0.0)
+        if spotify_key:
+            row['spotify_key'] = spotify_key
+        if spotify_key_index >= 0:
+            row['spotify_key_index'] = spotify_key_index
+        if spotify_is_minor is not None:
+            row['spotify_is_minor'] = spotify_is_minor
+
+        if runtime_fields:
+            runtime_keys = {
+                'vj_effect',
+                'vj_previous_effect',
+                'vj_effect_label',
+                'vj_playlist_mode',
+                'vj_playlist_index',
+                'vj_playlist_size',
+                'vj_fps',
+                'vj_frame_ms',
+                'vj_audio_source',
+                'vj_audio_profile',
+                'vj_audio_bass',
+                'vj_audio_mid',
+                'vj_audio_treble',
+                'vj_audio_rms',
+                'vj_audio_bpm',
+                'vj_audio_beat',
+                'vj_audio_bass_flux',
+                'vj_audio_mid_flux',
+                'vj_audio_fft_peak',
+                'vj_audio_fft_mean',
+                'vj_audio_fft_peak_bin',
+                'vj_audio_waveform_peak',
+                'vj_audio_waveform_rms',
+                'vj_audio_waveform_mean_abs',
+            }
+            for key, value in runtime_fields.items():
+                if value is None:
+                    continue
+                if key not in runtime_keys:
+                    continue
+                row[str(key)] = value
+        row['spotify_track_id'] = track_id
+
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('a', encoding='utf-8') as handle:
+            handle.write(json.dumps(row, sort_keys=True, default=str))
+            handle.write('\n')
+
+        self._live_corpus_last_signature = signature
+        return True
+
+    @staticmethod
+    def _extract_live_audio_features(audio: np.ndarray, sample_rate: int) -> dict[str, Any]:
+        """Extract Essentia or fallback summary features from live PCM samples."""
+
+        samples = np.asarray(audio, dtype=np.float32).reshape(-1)
+        if samples.size == 0:
+            return {}
+
+        rms = float(np.sqrt(np.mean(np.square(samples), dtype=np.float64)))
+        peak = float(np.max(np.abs(samples)))
+        crest_factor = float(peak / rms) if rms > 0.0 else 0.0
+        duration_s = float(samples.size / max(1, sample_rate))
+        bpm = 0.0
+        bpm_confidence = 0.0
+        beat_count = 0
+        beat_density = 0.0
+        danceability = 0.0
+        loudness = 0.0
+        key_name = 'unknown'
+        scale_name = 'unknown'
+        key_strength = 0.0
+
+        try:
+            import essentia.standard as es
+        except Exception:
+            es = None
+
+        if es is not None:
+            try:
+                bpm, beats, bpm_confidence, _, _ = es.RhythmExtractor2013()(samples)
+                beat_count = int(len(beats))
+                beat_density = float(beat_count / duration_s) if duration_s > 0.0 else 0.0
+            except Exception:
+                pass
+            try:
+                danceability, _ = es.Danceability()(samples)
+            except Exception:
+                pass
+            try:
+                loudness = float(es.Loudness()(samples))
+            except Exception:
+                pass
+            try:
+                key_name, scale_name, key_strength = es.KeyExtractor()(samples)
+            except Exception:
+                pass
+        else:
+            danceability = float(min(1.0, rms * 3.0))
+            loudness = float(20.0 * np.log10(max(rms, 1e-6)))
+
+        key_index = -1
+        key_sin = 0.0
+        key_cos = 1.0
+        is_minor = 0
+        key_map = {
+            'C': 0, 'C#': 1, 'DB': 1, 'D': 2, 'D#': 3, 'EB': 3, 'E': 4,
+            'F': 5, 'F#': 6, 'GB': 6, 'G': 7, 'G#': 8, 'AB': 8, 'A': 9,
+            'A#': 10, 'BB': 10, 'B': 11,
+        }
+        key_index = key_map.get(str(key_name).strip().upper(), -1)
+        if key_index >= 0:
+            angle = (2.0 * np.pi * key_index / 12.0)
+            key_sin = float(np.sin(angle))
+            key_cos = float(np.cos(angle))
+        if str(scale_name).strip().lower().startswith('minor'):
+            is_minor = 1
+
+        return {
+            'stream_duration_s': duration_s,
+            'stream_rms': rms,
+            'stream_peak_amplitude': peak,
+            'stream_crest_factor': crest_factor,
+            'stream_loudness': loudness,
+            'stream_bpm': float(bpm),
+            'stream_bpm_confidence': float(bpm_confidence),
+            'stream_beat_count': beat_count,
+            'stream_beat_density': beat_density,
+            'stream_danceability': float(danceability),
+            'stream_key': key_name,
+            'stream_scale': scale_name,
+            'stream_key_index': key_index,
+            'stream_key_sin': key_sin,
+            'stream_key_cos': key_cos,
+            'stream_is_minor': is_minor,
+            'stream_key_strength': float(key_strength),
+        }
+
+    @staticmethod
+    def _flatten_prefixed(value: Mapping[str, Any], prefix: str) -> dict[str, Any]:
+        """Flatten a nested mapping into a JSON-friendly prefixed key set."""
+
+        flattened: dict[str, Any] = {}
+
+        def _walk(node: Mapping[str, Any], path: tuple[str, ...]) -> None:
+            for key, item in node.items():
+                key_text = str(key).strip().lower()
+                if not key_text:
+                    continue
+                next_path = path + (key_text,)
+                if isinstance(item, Mapping):
+                    _walk(item, next_path)
+                elif isinstance(item, list):
+                    if not item:
+                        flattened[f'{prefix}_' + '_'.join(next_path)] = []
+                    elif all(not isinstance(entry, (dict, list)) for entry in item):
+                        flattened[f'{prefix}_' + '_'.join(next_path)] = item
+                elif item is not None:
+                    flattened[f'{prefix}_' + '_'.join(next_path)] = item
+
+        _walk(value, ())
+        return flattened
 
     @staticmethod
     def _safe_float(value: Any) -> float:

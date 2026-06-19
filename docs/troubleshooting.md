@@ -44,5 +44,5 @@ Last updated: 2026-06-05
 - Ensure path exists and JSON is valid.
 - Keys are canonicalized automatically, but the safest form is `spotify:track:<id>`.
 - The controller also accepts raw MPRIS ids such as `/com/spotify/track/<id>`.
-- If the file is still empty, populate it with `tools/export_audio_features.py`
-  against your Auto VJ logs and authenticated token store.
+- If the file is still empty, generate it with your local training pipeline and
+  confirm `[spotify].features_file` points to the resulting JSON.

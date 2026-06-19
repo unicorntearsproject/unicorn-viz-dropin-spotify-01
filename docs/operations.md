@@ -2,7 +2,7 @@
 
 Owner: Drop-in Maintainers
 Status: active
-Last updated: 2026-05-24
+Last updated: 2026-06-18
 
 ## Runtime Behavior
 
@@ -10,6 +10,9 @@ Last updated: 2026-05-24
 - Polls Spotify Web API when `[spotify.web_api].enabled = true`
 - Updates metadata/auth snapshot for other controllers
 - Supports `Ctrl+Alt+S` to begin auth and `Ctrl+Alt+Shift+S` to clear local auth
+- Can stream live training rows to `[spotify].live_corpus_file` while a set is
+	running
+- Use `tools/training/` for offline corpus generation and backfills
 
 ## Startup Expectations
 
