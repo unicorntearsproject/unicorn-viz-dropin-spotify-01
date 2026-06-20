@@ -360,12 +360,13 @@ class TestErrorHandling:
             snapshot = controller.snapshot()
             assert snapshot['last_error'] == 'api_error'
 
-    def test_auth_status_error_states(self, mock_app: MockApp) -> None:
+    def test_auth_status_error_states(self, mock_app: MockApp, tmp_path: Path) -> None:
         """Test various auth error states."""
         cfg = {
             'web_api': {
                 'enabled': True,
                 'client_id': 'test',
+                'token_store': str(tmp_path / 'nonexistent-token.json'),
             }
         }
         with patch('sys.platform', 'linux'):

@@ -204,9 +204,15 @@ class TestStateInitialization:
             assert controller._is_playing is False
             assert controller._available is False
 
-    def test_initial_web_api_state(self, mock_app: MockApp) -> None:
+    def test_initial_web_api_state(self, mock_app: MockApp, tmp_path: Path) -> None:
         """Test that web API state is initialized correctly."""
-        cfg = {'web_api': {'enabled': True, 'client_id': 'test'}}
+        cfg = {
+            'web_api': {
+                'enabled': True,
+                'client_id': 'test',
+                'token_store': str(tmp_path / 'nonexistent-token.json'),
+            }
+        }
         with patch('sys.platform', 'linux'):
             controller = SpotifyController(mock_app, cfg)
             assert controller._playback is None

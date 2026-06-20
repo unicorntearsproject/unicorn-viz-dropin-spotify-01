@@ -93,6 +93,15 @@ class SpotifyController:
             1.0,
             float(self._cfg.get('now_playing_banner_hold_s', 10.0) or 10.0),
         )
+        # Delay before the now-playing banner fires after a track change, to
+        # absorb extended DJ transitions where the incoming track is briefly
+        # detected before the mix fully lands.
+        self._now_playing_banner_delay_s = max(
+            0.0,
+            float(self._cfg.get('now_playing_banner_delay_s', 15.0) or 15.0),
+        )
+        self._banner_exposed_change_counter: int = 0
+        self._banner_promote_at: float = 0.0
 
         self._playerctl = shutil.which('playerctl')
         if self._local_enabled and sys.platform == 'win32':
@@ -262,9 +271,13 @@ class SpotifyController:
         if (now - self._last_poll_t) < self._poll_interval_s:
             if self._is_playing and self._track_started_t > 0.0:
                 self._position_s = max(0.0, self._position_s + max(0.0, float(dt)))
-            return
-        self._last_poll_t = now
-        self._poll_playerctl(now)
+        else:
+            self._last_poll_t = now
+            self._poll_playerctl(now)
+        # Promote the banner change counter once the transition delay has elapsed.
+        if self._banner_promote_at > 0.0 and now >= self._banner_promote_at:
+            self._banner_exposed_change_counter = self._change_counter
+            self._banner_promote_at = 0.0
 
     def _update_web_api(self) -> None:
         """Refresh authenticated Spotify Web API payloads."""
@@ -343,6 +356,7 @@ class SpotifyController:
             'position_s': position,
             'progress': progress,
             'change_counter': self._change_counter,
+            'banner_change_counter': self._banner_exposed_change_counter,
             'now_playing_banner_enabled': self._now_playing_banner_enabled,
             'now_playing_banner_hold_s': self._now_playing_banner_hold_s,
             'bpm': float(features.get('bpm', 0.0) or 0.0),
@@ -533,6 +547,10 @@ class SpotifyController:
             self._artist = artist
             self._album = album
             self._change_counter += 1
+            # Arm the banner promotion timer; the new counter is withheld from
+            # the banner until the delay elapses so transient mid-mix detections
+            # do not flash the overlay prematurely.
+            self._banner_promote_at = now + self._now_playing_banner_delay_s
             self._position_s = 0.0
             self._track_started_t = now
             log.info('Spotify track: %s - %s', self._artist or 'Unknown artist', self._title or 'Unknown title')
