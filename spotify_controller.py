@@ -232,6 +232,7 @@ class SpotifyController:
         self._playback: dict[str, Any] | None = None
         self._queue: list[dict[str, Any]] = []
         self._playlist_context: dict[str, Any] | None = None
+        self._display_name: str = ''
         self._auth_thread: threading.Thread | None = None
 
         if self._web_enabled and self._client_id:
@@ -405,6 +406,7 @@ class SpotifyController:
             'web_api_enabled': bool(self._web_enabled),
             'auth_ready': bool(self._auth_ready),
             'auth_status': str(self._auth_status),
+            'display_name': str(self._display_name),
             'needs_auth': str(self._auth_status)
             in {
                 'needs_auth',
@@ -534,6 +536,7 @@ class SpotifyController:
         self._queue = []
         self._playlist_context = None
         self._playback = None
+        self._display_name = ''
         self._auth_status = 'logged_out'
         self._last_error = ''
         return 'Spotify logged out' if deleted else 'Spotify session cleared'
@@ -857,6 +860,8 @@ class SpotifyController:
             if self._token_expired():
                 if not self._refresh_access_token():
                     return
+            if not self._display_name:
+                self._fetch_display_name()
             self._refresh_remote_state(
                 do_queue=do_queue,
                 do_playlist_context=do_playlist_context,
@@ -864,6 +869,16 @@ class SpotifyController:
         finally:
             with self._state_lock:
                 self._web_poll_inflight = False
+
+    def _fetch_display_name(self) -> None:
+        """Fetch the authenticated user's display name from /me (once per session)."""
+        me = self._api_get('/me')
+        if isinstance(me, dict):
+            name = str(me.get('display_name', '') or '').strip()
+            if not name:
+                name = str(me.get('id', '') or '').strip()
+            with self._state_lock:
+                self._display_name = name
 
     def _resolve_features_path(self, configured: Any) -> Path | None:
         if not configured:
