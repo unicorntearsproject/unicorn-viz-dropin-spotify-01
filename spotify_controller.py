@@ -163,24 +163,32 @@ class SpotifyController:
 
         self._change_counter: int = 0
 
+        # When playerctl is active it detects track changes locally, so web API
+        # polls are event-driven (triggered by track change) rather than timed.
+        # The timed fallback is used when playerctl is unavailable (Windows) so
+        # the web API becomes the primary track-change detector.
+        # poll_interval_s: used as the timed interval on Windows-only setups AND
+        #   as the slow health-check fallback when playerctl is active.
         self._web_poll_interval_s = max(
             1.5,
             float(self._web_cfg.get('poll_interval_s', 3.0) or 3.0),
         )
+        # Slow health-check fallback when event-driven (playerctl active): fires
+        # every N seconds just to catch any missed events or auth expiry.
+        self._web_poll_fallback_s = max(
+            30.0,
+            float(self._web_cfg.get('poll_fallback_s', 60.0) or 60.0),
+        )
         self._web_last_poll_t = -1e9
+        self._web_refresh_pending: bool = False
         self._http_timeout_s = max(
             0.2,
             float(self._web_cfg.get('http_timeout_s', 2.0) or 2.0),
         )
-        self._queue_poll_every_n = max(
-            1,
-            int(self._web_cfg.get('queue_poll_every_n', 2) or 2),
-        )
-        self._playlist_poll_every_n = max(
-            1,
-            int(self._web_cfg.get('playlist_poll_every_n', 4) or 4),
-        )
-        self._resolve_queue = bool(self._web_cfg.get('resolve_queue', True))
+        # Queue polling: original use case (pre-fetching BPM for transitions) is
+        # removed. Disabled by default; enable in config if you want queue length
+        # for display purposes.
+        self._resolve_queue = bool(self._web_cfg.get('resolve_queue', False))
         self._resolve_playlist_context = bool(
             self._web_cfg.get('resolve_playlist_context', True)
         )
@@ -280,10 +288,34 @@ class SpotifyController:
             self._banner_promote_at = 0.0
 
     def _update_web_api(self) -> None:
-        """Refresh authenticated Spotify Web API payloads."""
+        """Refresh authenticated Spotify Web API payloads.
+
+        When playerctl is active, polls are event-driven: a track change sets
+        _web_refresh_pending and this method fires immediately on the next frame.
+        A slow fallback timer (poll_fallback_s, default 60 s) catches any missed
+        events and performs auth health checks.
+
+        When playerctl is NOT available (Windows), the web API is the primary
+        track detector and polls on the regular poll_interval_s cadence.
+        """
         now = time.monotonic()
-        if (now - self._web_last_poll_t) < self._web_poll_interval_s:
-            return
+
+        pending = False
+        with self._state_lock:
+            if self._web_refresh_pending:
+                pending = True
+                self._web_refresh_pending = False
+
+        if not pending:
+            # Choose interval based on whether local detection is handling track changes.
+            interval = (
+                self._web_poll_fallback_s
+                if self._local_enabled
+                else self._web_poll_interval_s
+            )
+            if (now - self._web_last_poll_t) < interval:
+                return
+
         self._web_last_poll_t = now
 
         with self._state_lock:
@@ -292,8 +324,8 @@ class SpotifyController:
             self._web_poll_inflight = True
 
         self._web_poll_counter += 1
-        do_queue = (self._web_poll_counter % self._queue_poll_every_n) == 0
-        do_playlist_context = (self._web_poll_counter % self._playlist_poll_every_n) == 0
+        do_queue = self._resolve_queue  # queue disabled by default; honour config
+        do_playlist_context = pending or (self._web_poll_counter % 10 == 0)
         thread = threading.Thread(
             target=self._poll_worker,
             kwargs={
@@ -554,6 +586,10 @@ class SpotifyController:
             self._position_s = 0.0
             self._track_started_t = now
             log.info('Spotify track: %s - %s', self._artist or 'Unknown artist', self._title or 'Unknown title')
+            # Signal web API to refresh playlist context immediately on the next
+            # update() call rather than waiting for the slow fallback timer.
+            with self._state_lock:
+                self._web_refresh_pending = True
         elif track_id:
             self._track_id = track_id
             self._title = title
