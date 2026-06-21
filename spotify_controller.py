@@ -164,8 +164,8 @@ class SpotifyController:
         self._change_counter: int = 0
 
         self._web_poll_interval_s = max(
-            0.25,
-            float(self._web_cfg.get('poll_interval_s', 1.0) or 1.0),
+            1.5,
+            float(self._web_cfg.get('poll_interval_s', 3.0) or 3.0),
         )
         self._web_last_poll_t = -1e9
         self._http_timeout_s = max(
@@ -759,8 +759,25 @@ class SpotifyController:
         playback = self._api_get('/me/player')
         if playback is None:
             return
+
+        # Always refresh playlist context when the track changes so auto_vj sees
+        # the playlist name on the same poll cycle as the track change event.
+        new_item_id = ''
+        new_item = playback.get('item')
+        if isinstance(new_item, dict):
+            new_item_id = str(new_item.get('id', '') or '')
+        with self._state_lock:
+            old_playback = self._playback
+        old_item_id = ''
+        if isinstance(old_playback, dict):
+            old_item = old_playback.get('item')
+            if isinstance(old_item, dict):
+                old_item_id = str(old_item.get('id', '') or '')
+        if new_item_id and new_item_id != old_item_id:
+            do_playlist_context = True
+
         queue_items: list[dict[str, Any]] | None = None
-        playlist_context_out: dict[str, Any] | None | object = None
+        playlist_context_out: dict[str, Any] | None = None
         if self._resolve_queue and do_queue:
             queue_payload = self._api_get('/me/player/queue')
             if isinstance(queue_payload, dict):
@@ -784,14 +801,12 @@ class SpotifyController:
                         'total_tracks': int(tracks.get('total', 0) or 0),
                         'owner': str(owner.get('display_name', '') or ''),
                     }
-            else:
-                playlist_context_out = None
 
         with self._state_lock:
             self._playback = playback
             if queue_items is not None:
                 self._queue = queue_items
-            if playlist_context_out is not None:
+            if isinstance(playlist_context_out, dict):
                 self._playlist_context = playlist_context_out
 
     def _poll_worker(self, *, do_queue: bool, do_playlist_context: bool) -> None:
