@@ -12,8 +12,6 @@ poll_interval_s = 0.75
 command_timeout_s = 0.25
 now_playing_banner = true
 now_playing_banner_hold_s = 10.0
-# features_file = "assets/audio/spotify_features.json"
-
 [spotify.web_api]
 enabled = false
 client_id = ""
@@ -41,8 +39,6 @@ resolve_playlist_context = true
 - `command_timeout_s`: Per-command timeout guard in seconds.
 - `now_playing_banner`: Enables the top-pinned track-change banner.
 - `now_playing_banner_hold_s`: Time in seconds before the banner slides out.
-- `features_file`: Optional JSON map keyed by Spotify track id with locally
-  generated feature payload.
 
 ## Web API Keys
 
@@ -81,12 +77,7 @@ Accepted feature keys are canonicalized automatically. Use either:
 }
 ```
 
-## Local Feature Corpus
-
-The optional `features_file` is a local training artifact, not a runtime
-dependency. Keep the file in a private training workspace or generate it from
-an offline analysis pipeline, then point `[spotify].features_file` at the
-result if you want runtime feature hints.
+## Live Corpus
 
 The optional live corpus sink writes runtime rows directly when
 `[spotify].live_corpus_file` is configured. This is the path to use if you

@@ -1,14 +1,9 @@
-"""Tests for Spotify snapshot generation and feature caching."""
+"""Tests for Spotify snapshot generation and corpus path resolution."""
 from __future__ import annotations
 
-import json
 import sys
-import time
 from pathlib import Path
-from typing import Any
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -171,147 +166,35 @@ class TestSnapshot:
             assert controller.snapshot()['change_counter'] == 5  # nosec B101
 
 
-class TestFeatureCaching:
-    """Test feature cache loading and lookup."""
+class TestResolveCorpusPath:
+    """Test _resolve_features_path (used for live_corpus_file path resolution)."""
 
     def test_resolve_features_path_none(self, mock_app: MockApp) -> None:
-        """Test feature path resolution with None."""
+        """Test path resolution with None."""
         with patch('sys.platform', 'linux'):
             controller = SpotifyController(mock_app, {})
             result = controller._resolve_features_path(None)
             assert result is None  # nosec B101
 
     def test_resolve_features_path_empty_string(self, mock_app: MockApp) -> None:
-        """Test feature path resolution with empty string."""
+        """Test path resolution with empty string."""
         with patch('sys.platform', 'linux'):
             controller = SpotifyController(mock_app, {})
             result = controller._resolve_features_path('')
             assert result is None  # nosec B101
 
     def test_resolve_features_path_absolute(self, mock_app: MockApp, tmp_path: Path) -> None:
-        """Test absolute feature path is preserved."""
+        """Test absolute path is preserved."""
         with patch('sys.platform', 'linux'):
             controller = SpotifyController(mock_app, {})
-            abs_path = tmp_path / 'features.json'
+            abs_path = tmp_path / 'corpus.jsonl'
             result = controller._resolve_features_path(str(abs_path))
             assert result == abs_path  # nosec B101
 
     def test_resolve_features_path_relative(self, mock_app: MockApp) -> None:
-        """Test relative feature path is resolved to project root."""
+        """Test relative path is resolved to project root."""
         with patch('sys.platform', 'linux'):
             controller = SpotifyController(mock_app, {})
             with patch('pathlib.Path.resolve'):
-                result = controller._resolve_features_path('features/data.json')
+                result = controller._resolve_features_path('corpus/live.jsonl')
                 assert result is not None  # nosec B101
-
-    def test_refresh_features_cache_no_file(self, mock_app: MockApp) -> None:
-        """Test feature cache refresh with missing file."""
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, {})
-            controller._refresh_features_cache()
-            assert controller._features_cache == {}  # nosec B101
-
-    def test_refresh_features_cache_valid_json(
-        self, mock_app: MockApp, temp_features_file: Path, sample_features_data: dict[str, Any]
-    ) -> None:
-        """Test feature cache loads valid JSON."""
-        temp_features_file.write_text(json.dumps(sample_features_data))
-        cfg = {'features_file': str(temp_features_file)}
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, cfg)
-            controller._refresh_features_cache()
-            assert len(controller._features_cache) == 2  # nosec B101
-            assert 'spotify:track:track123' in controller._features_cache  # nosec B101
-
-    def test_refresh_features_cache_invalid_json(
-        self, mock_app: MockApp, temp_features_file: Path
-    ) -> None:
-        """Test feature cache handles invalid JSON."""
-        temp_features_file.write_text('not valid json {')
-        cfg = {'features_file': str(temp_features_file)}
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, cfg)
-            controller._refresh_features_cache()
-            assert controller._features_cache == {}  # nosec B101
-
-    def test_refresh_features_cache_not_dict(
-        self, mock_app: MockApp, temp_features_file: Path
-    ) -> None:
-        """Test feature cache handles non-dict JSON."""
-        temp_features_file.write_text('["list", "not", "dict"]')
-        cfg = {'features_file': str(temp_features_file)}
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, cfg)
-            controller._refresh_features_cache()
-            assert controller._features_cache == {}  # nosec B101
-
-    def test_feature_payload_track_found(
-        self, mock_app: MockApp, temp_features_file: Path, sample_features_data: dict[str, Any]
-    ) -> None:
-        """Test feature payload lookup finds track."""
-        temp_features_file.write_text(json.dumps(sample_features_data))
-        cfg = {'features_file': str(temp_features_file)}
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, cfg)
-            controller._refresh_features_cache()
-            payload = controller._feature_payload('spotify:track:track123')
-            assert payload['bpm'] == 120.0  # nosec B101
-            assert payload['energy'] == 0.85  # nosec B101
-
-    def test_feature_payload_track_not_found(
-        self, mock_app: MockApp, temp_features_file: Path, sample_features_data: dict[str, Any]
-    ) -> None:
-        """Test feature payload returns empty dict for missing track."""
-        temp_features_file.write_text(json.dumps(sample_features_data))
-        cfg = {'features_file': str(temp_features_file)}
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, cfg)
-            controller._refresh_features_cache()
-            payload = controller._feature_payload('spotify:track:nonexistent')
-            assert payload == {}  # nosec B101
-
-    def test_feature_payload_empty_track_id(self, mock_app: MockApp) -> None:
-        """Test feature payload with empty track ID."""
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, {})
-            payload = controller._feature_payload('')
-            assert payload == {}  # nosec B101
-
-    def test_feature_payload_no_features_file(self, mock_app: MockApp) -> None:
-        """Test feature payload when no features file configured."""
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, {})
-            payload = controller._feature_payload('spotify:track:123')
-            assert payload == {}  # nosec B101
-
-    def test_refresh_features_cache_mtime_optimization(
-        self, mock_app: MockApp, temp_features_file: Path, sample_features_data: dict[str, Any]
-    ) -> None:
-        """Test feature cache doesn't reload if mtime unchanged."""
-        temp_features_file.write_text(json.dumps(sample_features_data))
-        cfg = {'features_file': str(temp_features_file)}
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, cfg)
-            # First load
-            controller._refresh_features_cache()
-            first_cache = dict(controller._features_cache)
-            # Second load (same file)
-            controller._refresh_features_cache()
-            second_cache = dict(controller._features_cache)
-            assert first_cache == second_cache  # nosec B101
-
-    def test_snapshot_includes_features(
-        self, mock_app: MockApp, temp_features_file: Path, sample_features_data: dict[str, Any]
-    ) -> None:
-        """Test snapshot includes track features."""
-        temp_features_file.write_text(json.dumps(sample_features_data))
-        cfg = {'features_file': str(temp_features_file)}
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, cfg)
-            controller._track_id = 'spotify:track:track123'
-            controller._refresh_features_cache()
-
-            snapshot = controller.snapshot()
-            assert snapshot['bpm'] == 120.0  # nosec B101
-            assert snapshot['energy'] == 0.85  # nosec B101
-            assert snapshot['feature_confidence'] == 0.92  # nosec B101

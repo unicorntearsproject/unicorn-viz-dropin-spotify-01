@@ -11,18 +11,14 @@ from spotify_controller import SpotifyController
 
 def test_record_live_corpus_snapshot_writes_one_row(
     mock_app,
-    temp_features_file: Path,
     tmp_path: Path,
-    sample_features_data: dict[str, object],
 ) -> None:
-    temp_features_file.write_text(json.dumps(sample_features_data), encoding='utf-8')
     live_corpus_file = tmp_path / 'live-corpus.jsonl'
     pcm = np.sin(np.linspace(0.0, 8.0 * np.pi, 48000, dtype=np.float32)).astype(np.float32)
     mock_app.get_live_audio_window = lambda: (pcm, 48000)
     controller = SpotifyController(
         mock_app,
         {
-            'features_file': str(temp_features_file),
             'live_corpus_file': str(live_corpus_file),
         },
     )
@@ -84,10 +80,6 @@ def test_record_live_corpus_snapshot_writes_one_row(
     assert row['vj_effect'] == 'Audio Spectrum'
     assert row['vj_audio_source'] == 'spotify'
     assert row['vj_playlist_index'] == 2
-    assert row['spotify_bpm'] == 120.0
-    assert row['spotify_key'] == 'C'
-    assert row['spotify_key_index'] == 0
-    assert row['spotify_is_minor'] is True
     assert row['vj_audio_profile'] == 'House'
     assert row['vj_audio_fft_peak'] == 0.93
     assert row['vj_audio_waveform_peak'] == 0.81
@@ -121,18 +113,13 @@ def test_record_live_corpus_snapshot_writes_one_row(
 
 def test_record_live_corpus_snapshot_skips_without_live_path(
     mock_app,
-    temp_features_file: Path,
     tmp_path: Path,
-    sample_features_data: dict[str, object],
 ) -> None:
-    temp_features_file.write_text(json.dumps(sample_features_data), encoding='utf-8')
     pcm = np.sin(np.linspace(0.0, 8.0 * np.pi, 48000, dtype=np.float32)).astype(np.float32)
     mock_app.get_live_audio_window = lambda: (pcm, 48000)
     controller = SpotifyController(
         mock_app,
-        {
-            'features_file': str(temp_features_file),
-        },
+        {},
     )
 
     controller._available = True

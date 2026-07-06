@@ -137,9 +137,6 @@ class SpotifyController:
 
         self.enabled = self._local_enabled or self._web_enabled
 
-        self._features_path = self._resolve_features_path(self._cfg.get('features_file'))
-        self._features_mtime_ns: int = -1
-        self._features_cache: dict[str, dict[str, Any]] = {}
         self._live_corpus_path = self._resolve_features_path(self._cfg.get('live_corpus_file'))
         self._live_corpus_last_signature = ''
 
@@ -345,7 +342,6 @@ class SpotifyController:
     def snapshot(self) -> dict[str, Any]:
         """Return the current Spotify metadata snapshot for integrations."""
         canonical_track_id = self._canonical_track_id(self._track_id)
-        features = self._feature_payload(canonical_track_id)
         duration = max(0.0, float(self._duration_s))
         position = max(0.0, float(self._position_s))
         progress = min(1.0, position / duration) if duration > 0.0 else 0.0
@@ -392,17 +388,14 @@ class SpotifyController:
             'banner_change_counter': self._banner_exposed_change_counter,
             'now_playing_banner_enabled': self._now_playing_banner_enabled,
             'now_playing_banner_hold_s': self._now_playing_banner_hold_s,
-            'bpm': float(features.get('bpm', 0.0) or 0.0),
-            'energy': float(features.get('energy', 0.0) or 0.0),
-            'danceability': float(features.get('danceability', 0.0) or 0.0),
-            'valence': float(features.get('valence', 0.0) or 0.0),
-            'feature_confidence': float(features.get('confidence', 0.0) or 0.0),
-            'tags': self._normalize_tags(features.get('tags', [])),
-            'genres': self._normalize_tags(features.get('genres', [])),
-            'tag_confidence': float(
-                features.get('tag_confidence', features.get('confidence', 0.0))
-                or 0.0
-            ),
+            'bpm': 0.0,
+            'energy': 0.0,
+            'danceability': 0.0,
+            'valence': 0.0,
+            'feature_confidence': 0.0,
+            'tags': [],
+            'genres': [],
+            'tag_confidence': 0.0,
             'web_api_enabled': bool(self._web_enabled),
             'auth_ready': bool(self._auth_ready),
             'auth_status': str(self._auth_status),
@@ -892,45 +885,6 @@ class SpotifyController:
         project_root = Path(__file__).resolve().parents[2]
         return project_root / path
 
-    def _feature_payload(self, track_id: str) -> dict[str, Any]:
-        if not track_id:
-            return {}
-        if self._features_path is None:
-            return {}
-        self._refresh_features_cache()
-        row = self._features_cache.get(track_id.lower())
-        if isinstance(row, dict):
-            return row
-        return {}
-
-    def _refresh_features_cache(self) -> None:
-        path = self._features_path
-        if path is None:
-            return
-        try:
-            stat = path.stat()
-        except Exception:
-            return
-        mtime_ns = int(getattr(stat, 'st_mtime_ns', 0))
-        if mtime_ns == self._features_mtime_ns:
-            return
-        self._features_mtime_ns = mtime_ns
-        try:
-            with path.open('r', encoding='utf-8') as f:
-                payload = json.load(f)
-        except Exception as exc:
-            log.warning('SpotifyController failed to load features file %s: %s', path, exc)
-            return
-        if not isinstance(payload, dict):
-            return
-
-        rows: dict[str, dict[str, Any]] = {}
-        for key, value in payload.items():
-            if not isinstance(key, str) or not isinstance(value, dict):
-                continue
-            rows[self._canonical_track_id(key)] = value
-        self._features_cache = rows
-
     def record_live_corpus_snapshot(
         self,
         snapshot: Mapping[str, Any],
@@ -971,7 +925,6 @@ class SpotifyController:
             if isinstance(pcm, np.ndarray) and pcm.size > 0 and stream_rate > 0:
                 stream_features = self._extract_live_audio_features(pcm, int(stream_rate))
 
-        features = self._feature_payload(track_id)
         row: dict[str, Any] = {}
         for key in (
             'track_id',
@@ -988,52 +941,6 @@ class SpotifyController:
 
         if stream_features:
             row.update(stream_features)
-
-        spotify_bpm = features.get('tempo') if 'tempo' in features else features.get('bpm') if 'bpm' in features else None
-        spotify_key_value = features.get('key', '')
-        spotify_mode_value = features.get('mode', None)
-        spotify_key_names = ('C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B')
-        spotify_key_index = -1
-        spotify_key = ''
-        if isinstance(spotify_key_value, (int, np.integer)):
-            spotify_key_index = int(spotify_key_value)
-            if 0 <= spotify_key_index < len(spotify_key_names):
-                spotify_key = spotify_key_names[spotify_key_index]
-        else:
-            spotify_key_text = str(spotify_key_value).strip()
-            if spotify_key_text:
-                if spotify_key_text.isdigit():
-                    spotify_key_index = int(spotify_key_text)
-                    if 0 <= spotify_key_index < len(spotify_key_names):
-                        spotify_key = spotify_key_names[spotify_key_index]
-                else:
-                    spotify_key = spotify_key_text
-                    key_lookup = spotify_key.upper()
-                    for idx, key_name in enumerate(spotify_key_names):
-                        if key_name == key_lookup:
-                            spotify_key_index = idx
-                            break
-
-        spotify_is_minor: bool | None = None
-        if spotify_mode_value is not None:
-            if isinstance(spotify_mode_value, bool):
-                spotify_is_minor = not spotify_mode_value
-            else:
-                try:
-                    spotify_is_minor = int(spotify_mode_value) == 0
-                except Exception:
-                    mode_text = str(spotify_mode_value).strip().lower()
-                    if mode_text:
-                        spotify_is_minor = mode_text.startswith('minor')
-
-        if spotify_bpm is not None:
-            row['spotify_bpm'] = float(spotify_bpm or 0.0)
-        if spotify_key:
-            row['spotify_key'] = spotify_key
-        if spotify_key_index >= 0:
-            row['spotify_key_index'] = spotify_key_index
-        if spotify_is_minor is not None:
-            row['spotify_is_minor'] = spotify_is_minor
 
         if runtime_fields:
             runtime_keys = {

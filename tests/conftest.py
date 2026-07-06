@@ -43,17 +43,6 @@ def temp_token_file() -> Path:
 
 
 @pytest.fixture
-def temp_features_file() -> Path:
-    """Provide a temporary features file."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        temp_path = Path(f.name)
-    yield temp_path
-    # Cleanup
-    if temp_path.exists():
-        temp_path.unlink()
-
-
-@pytest.fixture
 def sample_token_payload() -> dict[str, Any]:
     """Provide a sample Spotify token response."""
     return {
@@ -132,32 +121,3 @@ def sample_playlist_payload() -> dict[str, Any]:
     }
 
 
-@pytest.fixture
-def sample_features_data() -> dict[str, Any]:
-    """Provide sample track features data."""
-    return {
-        'spotify:track:track123': {
-            'tempo': 120.0,
-            'bpm': 120.0,
-            'energy': 0.85,
-            'danceability': 0.72,
-            'valence': 0.68,
-            'confidence': 0.92,
-            'key': 'C',
-            'mode': 'minor',
-            'tags': ['upbeat', 'electronic', 'dance'],
-            'genres': ['house', 'electronic', 'dance pop'],
-        },
-        'spotify:track:track456': {
-            'tempo': 95.0,
-            'bpm': 95.0,
-            'energy': 0.65,
-            'danceability': 0.58,
-            'valence': 0.55,
-            'confidence': 0.88,
-            'key': 'G',
-            'mode': 'major',
-            'tags': ['chill', 'ambient'],
-            'genres': ['indie', 'alternative'],
-        },
-    }
