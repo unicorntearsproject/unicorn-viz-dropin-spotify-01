@@ -29,6 +29,11 @@ import numpy as np
 
 log = logging.getLogger(__name__)
 
+HELP_ENTRIES = [
+    ('Spotify', 'Ctrl+Alt+S', 'Start Spotify auth flow'),
+    ('Spotify', 'Ctrl+Alt+Shift+S', 'Logout Spotify auth (clear local token)'),
+]
+
 _AUTH_BASE_URL = 'https://accounts.spotify.com/authorize'
 _TOKEN_URL = 'https://accounts.spotify.com/api/token'
 _API_BASE_URL = 'https://api.spotify.com/v1'
