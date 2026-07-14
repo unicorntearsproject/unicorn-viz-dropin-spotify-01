@@ -1,6 +1,7 @@
 # spotify-01
 
 Owner: Drop-in Maintainers
+Version: 1.0.0-rc.1
 Status: active
 Last updated: 2026-05-24
 
@@ -57,3 +58,7 @@ For operator setup prerequisites, see `docs/web-api-auth-prep.md`.
 ## Troubleshooting
 
 See `docs/troubleshooting.md`.
+
+## Changelog
+
+- **1.0.0-rc.1** — initial versioned release.

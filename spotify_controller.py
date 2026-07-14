@@ -6,6 +6,8 @@ playlist-awareness.
 """
 from __future__ import annotations
 
+__version__ = '1.0.0-rc.1'
+
 import base64
 import hashlib
 import json
