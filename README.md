@@ -1,7 +1,7 @@
 # spotify-01
 
 Owner: Drop-in Maintainers
-Version: 1.0.0-rc.1
+Version: 1.0.0-rc.2
 Status: active
 Last updated: 2026-05-24
 
@@ -60,5 +60,10 @@ For operator setup prerequisites, see `docs/web-api-auth-prep.md`.
 See `docs/troubleshooting.md`.
 
 ## Changelog
+
+- **1.0.0-rc.2** — Register with the core **now-playing announcement hub**
+  (`vj_api.register_now_playing`, priority 10, ambient) instead of being
+  hard-wired in `app.py`; the same banner/HUD machinery now serves Spotify,
+  the media player, and the DJ mixer.  Guarded no-op on older cores.
 
 - **1.0.0-rc.1** — initial versioned release.

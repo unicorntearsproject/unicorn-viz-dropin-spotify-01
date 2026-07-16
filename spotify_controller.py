@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.1'
+__version__ = '1.0.0-rc.2'
 
 import base64
 import hashlib
@@ -244,6 +244,17 @@ class SpotifyController:
         elif self._web_enabled:
             self._auth_status = 'missing_client_id'
 
+        # Announce through the core now-playing hub (banner + HUD pane).
+        # Ambient: Spotify's metadata pane is useful even while nothing local
+        # plays.  Guarded so older cores without the hub still work.
+        vj = getattr(app, 'vj_api', None)
+        if vj is not None and hasattr(vj, 'register_now_playing'):
+            try:
+                vj.register_now_playing('spotify', self.snapshot,
+                                        priority=10, ambient=True)
+            except Exception as exc:
+                log.debug('spotify-01: now-playing registration failed: %s', exc)
+
     def handle_key(self, sym: int, mod: int) -> 'str | None | bool':
         """Handle Ctrl+Alt+S (auth) and Ctrl+Alt+Shift+S (logout)."""
         import sdl2  # noqa: PLC0415
@@ -344,7 +355,12 @@ class SpotifyController:
 
     def shutdown(self) -> None:
         """Shutdown hook for the app subsystem manager."""
-        return
+        vj = getattr(self._app, 'vj_api', None)
+        if vj is not None and hasattr(vj, 'unregister_now_playing'):
+            try:
+                vj.unregister_now_playing('spotify')
+            except Exception:
+                pass
 
     def snapshot(self) -> dict[str, Any]:
         """Return the current Spotify metadata snapshot for integrations."""
