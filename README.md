@@ -1,7 +1,7 @@
 # spotify-01
 
 Owner: Drop-in Maintainers
-Version: 1.0.0-rc.2
+Version: 1.0.0-rc.3
 Status: active
 Last updated: 2026-05-24
 
@@ -61,6 +61,7 @@ See `docs/troubleshooting.md`.
 
 ## Changelog
 
+- **1.0.0-rc.3** — HTTP 429 handling per the Spotify API rules: honor `Retry-After`, exponential backoff (capped 120 s) when absent, and skip requests locally while rate-limited; token store now written 0600 (refresh token was world-readable). 5 regression tests.
 - **1.0.0-rc.2** — Register with the core **now-playing announcement hub**
   (`vj_api.register_now_playing`, priority 10, ambient) instead of being
   hard-wired in `app.py`; the same banner/HUD machinery now serves Spotify,

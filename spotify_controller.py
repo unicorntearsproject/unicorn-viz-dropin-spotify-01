@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.2'
+__version__ = '1.0.0-rc.3'
 
 import base64
 import hashlib
@@ -189,6 +189,11 @@ class SpotifyController:
             0.2,
             float(self._web_cfg.get('http_timeout_s', 2.0) or 2.0),
         )
+        # HTTP 429 handling (Spotify rate limits): while rate-limited every
+        # _api_get is skipped locally until this deadline; Retry-After is
+        # honored when present, exponential backoff (capped) when absent.
+        self._rate_limited_until: float = 0.0
+        self._rate_limit_streak: int = 0
         # Queue polling: original use case (pre-fetching BPM for transitions) is
         # removed. Disabled by default; enable in config if you want queue length
         # for display purposes.
@@ -669,6 +674,12 @@ class SpotifyController:
         self._token_store.parent.mkdir(parents=True, exist_ok=True)
         with self._token_store.open('w', encoding='utf-8') as f:
             json.dump(self._token, f, indent=2, sort_keys=True)
+        # The refresh token is a long-lived credential: owner-only on
+        # multiuser systems (best-effort no-op on Windows ACL filesystems).
+        try:
+            os.chmod(self._token_store, 0o600)
+        except Exception:
+            pass
 
     def _token_expired(self, skew_s: float = 30.0) -> bool:
         return time.time() >= (self._token_expires_at - skew_s)
@@ -767,6 +778,9 @@ class SpotifyController:
         return {'Authorization': f'Bearer {token}'}
 
     def _api_get(self, path: str, query: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        if time.time() < self._rate_limited_until:
+            self._last_error = f'api_get_skipped_rate_limited:{path}'
+            return None
         headers = self._auth_headers()
         if headers is None:
             return None
@@ -779,11 +793,30 @@ class SpotifyController:
         try:
             with urllib.request.urlopen(request, timeout=self._http_timeout_s) as response:  # nosec B310
                 if response.status == 204:
+                    self._rate_limit_streak = 0
                     return {}
+                self._rate_limit_streak = 0
                 return json.loads(response.read().decode('utf-8'))
         except urllib.error.HTTPError as exc:
             if exc.code == 401:
                 self._auth_status = 'token_expired'
+            elif exc.code == 429:
+                # Honor Retry-After (Spotify Web API rule); exponential
+                # backoff capped at 120 s when the header is absent.
+                retry_after = 0.0
+                try:
+                    retry_after = float(
+                        (exc.headers.get('Retry-After', '') or '').strip() or 0.0
+                    )
+                except Exception:
+                    retry_after = 0.0
+                self._rate_limit_streak += 1
+                if retry_after <= 0.0:
+                    retry_after = min(120.0, 2.0 ** self._rate_limit_streak)
+                self._rate_limited_until = time.time() + retry_after
+                log.warning(
+                    'Spotify rate-limited (429) — backing off %.0fs', retry_after
+                )
             self._last_error = f'api_get_failed:{path}:{exc.code}'
             return None
         except Exception as exc:
