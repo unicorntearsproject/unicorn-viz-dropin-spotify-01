@@ -1,7 +1,7 @@
 # spotify-01
 
 Owner: Drop-in Maintainers
-Version: 1.0.0-rc.5
+Version: 1.0.0-rc.6
 Status: active
 Last updated: 2026-05-24
 
@@ -61,6 +61,10 @@ See `docs/troubleshooting.md`.
 
 ## Changelog
 
+- **1.0.0-rc.6** — The local playerctl poll (two subprocess spawns every
+  0.75 s: metadata + position) runs on a `spotify-playerctl` worker instead
+  of the render thread; the poll's results are committed under the state
+  lock so `snapshot()` never reads a half-updated track.
 - **1.0.0-rc.5** — Control Room panel moves to the shared `sources` page (owner decision, 2026-09-05) and is unregistered in `shutdown()` so a mid-session stop never leaves a dead panel behind.
 - **1.0.0-rc.4** — **Control Room panel, P2 of
   `docs/planning/control-room-panel-registry-plan-2026-09-04.md`.**

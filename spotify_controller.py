@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.5'
+__version__ = '1.0.0-rc.6'
 
 import base64
 import hashlib
@@ -205,6 +205,7 @@ class SpotifyController:
         self._web_poll_counter = 0
         self._web_poll_inflight = False
         self._state_lock = threading.Lock()
+        self._local_poll_thread: threading.Thread | None = None
 
         self._client_id = str(
             self._web_cfg.get('client_id', '')
@@ -329,7 +330,16 @@ class SpotifyController:
                 self._position_s = max(0.0, self._position_s + max(0.0, float(dt)))
         else:
             self._last_poll_t = now
-            self._poll_playerctl(now)
+            # Two playerctl spawns per poll (metadata + position) used to run
+            # here, on the main thread, every 0.75 s.  They now run on a
+            # worker; a poll still in flight is simply not doubled up.
+            t = self._local_poll_thread
+            if t is None or not t.is_alive():
+                self._local_poll_thread = threading.Thread(
+                    target=self._poll_playerctl, args=(now,),
+                    name='spotify-playerctl', daemon=True,
+                )
+                self._local_poll_thread.start()
         # Promote the banner change counter once the transition delay has elapsed.
         if self._banner_promote_at > 0.0 and now >= self._banner_promote_at:
             self._banner_exposed_change_counter = self._change_counter
@@ -663,6 +673,17 @@ class SpotifyController:
         length_us = self._safe_float(parts[5])
         duration_s = max(0.0, length_us / 1_000_000.0)
 
+        # Position is the second spawn; fetch it before taking the lock so
+        # the lock is only held for attribute writes (this runs off-thread).
+        pos_parts = self._run_playerctl('position')
+        with self._state_lock:
+            self._apply_playerctl(now, status, track_id, title, artist, album,
+                                  duration_s, pos_parts)
+
+    def _apply_playerctl(self, now: float, status: str, track_id: str, title: str,
+                         artist: str, album: str, duration_s: float,
+                         pos_parts: list[str] | None) -> None:
+        """Commit one poll's results.  Caller holds ``_state_lock``."""
         old_track_key = self._track_key(self._track_id, self._title, self._artist)
         new_track_key = self._track_key(track_id, title, artist)
 
@@ -690,15 +711,13 @@ class SpotifyController:
             log.info('Spotify track: %s - %s', self._artist or 'Unknown artist', self._title or 'Unknown title')
             # Signal web API to refresh playlist context immediately on the next
             # update() call rather than waiting for the slow fallback timer.
-            with self._state_lock:
-                self._web_refresh_pending = True
+            self._web_refresh_pending = True        # lock already held
         elif track_id:
             self._track_id = track_id
             self._title = title
             self._artist = artist
             self._album = album
 
-        pos_parts = self._run_playerctl('position')
         if pos_parts and pos_parts[0]:
             self._position_s = max(0.0, self._safe_float(pos_parts[0]))
             self._track_started_t = now
