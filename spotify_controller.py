@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.3'
+__version__ = '1.0.0-rc.4'
 
 import base64
 import hashlib
@@ -260,6 +260,32 @@ class SpotifyController:
             except Exception as exc:
                 log.debug('spotify-01: now-playing registration failed: %s', exc)
 
+        # Control Room panel (docs/planning/control-room-panel-registry-plan-
+        # 2026-09-04.md, P2): registers real state instead of the old
+        # hardcoded CR panel, which reached into this instance via
+        # vj_api.get_subsystem('spotify') + getattr duck-typing. Deferred
+        # import + try/except so a core without the registry just gets no
+        # panel, never a crash.
+        if vj is not None:
+            try:
+                from unicornviz.operator_panels import (  # noqa: PLC0415
+                    OperatorPanel,
+                )
+                vj.register_operator_panel(OperatorPanel(
+                    name='spotify',
+                    title='Spotify',
+                    priority=40,
+                    size='medium',
+                    content=self._operator_panel_content,
+                    on_action=self._operator_panel_action,
+                    tooltips={
+                        'auth': 'Start Spotify login (opens the auth flow)',
+                        'logout': 'Disconnect the Spotify account',
+                    },
+                ))
+            except Exception as exc:
+                log.debug('spotify-01: operator panel registration failed: %s', exc)
+
     def handle_key(self, sym: int, mod: int) -> 'str | None | bool':
         """Handle Ctrl+Alt+S (auth) and Ctrl+Alt+Shift+S (logout)."""
         import sdl2  # noqa: PLC0415
@@ -443,6 +469,53 @@ class SpotifyController:
             'poll_inflight': poll_inflight,
             'source': source,
         }
+
+    def _operator_panel_content(self) -> Any:
+        """Build the Control Room panel's live state (see registration above).
+
+        Runs on the Control Room's render thread; reads only, via the same
+        snapshot() every other now-playing consumer uses -- no new state,
+        no mutation.
+        """
+        from unicornviz.operator_panels import (  # noqa: PLC0415
+            PanelButton, PanelContent, PanelMeter, PanelRow,
+        )
+        snap = self.snapshot()
+        status = str(snap.get('status', '-') or '-').upper()
+        auth_status = str(snap.get('auth_status', 'disabled') or 'disabled').replace('_', ' ').upper()
+        title = str(snap.get('title', '') or '').strip() or '-'
+        artist = str(snap.get('artist', '') or '').strip() or '-'
+        web_enabled = bool(snap.get('web_api_enabled', False))
+        duration_s = float(snap.get('duration_s', 0.0) or 0.0)
+        position_s = float(snap.get('position_s', 0.0) or 0.0)
+        progress = float(snap.get('progress', 0.0) or 0.0)
+
+        def _fmt_secs(value: float) -> str:
+            total = max(0, int(value))
+            return f'{total // 60:02d}:{total % 60:02d}'
+
+        return PanelContent(
+            status=status,
+            rows=(
+                PanelRow('Track', f'{artist} - {title}'),
+                PanelRow('Auth', auth_status, emphasis='success' if web_enabled else ''),
+            ),
+            meters=(
+                PanelMeter('Progress', progress, f'{_fmt_secs(position_s)}/{_fmt_secs(duration_s)}'),
+            ),
+            buttons=(
+                PanelButton('auth', 'AUTH', active=web_enabled),
+                PanelButton('logout', 'LOGOUT', accent='danger'),
+            ),
+        )
+
+    def _operator_panel_action(self, action: str, _payload: Any) -> str | None:
+        """Handle a Control Room panel button; see registration above."""
+        if action == 'auth':
+            return self.begin_auth_async()
+        if action == 'logout':
+            return self.logout()
+        return None
 
     def begin_auth_async(self, timeout_s: float = 180.0) -> str:
         """Start PKCE auth in a background thread and return immediately."""

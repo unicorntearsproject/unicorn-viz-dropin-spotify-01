@@ -1,7 +1,7 @@
 # spotify-01
 
 Owner: Drop-in Maintainers
-Version: 1.0.0-rc.3
+Version: 1.0.0-rc.4
 Status: active
 Last updated: 2026-05-24
 
@@ -61,6 +61,15 @@ See `docs/troubleshooting.md`.
 
 ## Changelog
 
+- **1.0.0-rc.4** — **Control Room panel, P2 of
+  `docs/planning/control-room-panel-registry-plan-2026-09-04.md`.**
+  Registers a declarative `Spotify` panel via `vj_api.register_operator_panel()`
+  (guarded, degrades to no panel on an older core), replacing Control
+  Room's hardcoded panel, which reached in via
+  `vj_api.get_subsystem('spotify')` + `getattr` duck typing. The panel
+  shows status/track/auth plus a playback-progress meter, all read
+  through `snapshot()` like every other integration; AUTH and LOGOUT
+  buttons call `begin_auth_async()`/`logout()` directly. 7 new tests.
 - **1.0.0-rc.3** — HTTP 429 handling per the Spotify API rules: honor `Retry-After`, exponential backoff (capped 120 s) when absent, and skip requests locally while rate-limited; token store now written 0600 (refresh token was world-readable). 5 regression tests.
 - **1.0.0-rc.2** — Register with the core **now-playing announcement hub**
   (`vj_api.register_now_playing`, priority 10, ambient) instead of being
