@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.4'
+__version__ = '1.0.0-rc.5'
 
 import base64
 import hashlib
@@ -274,6 +274,7 @@ class SpotifyController:
                 vj.register_operator_panel(OperatorPanel(
                     name='spotify',
                     title='Spotify',
+                    page='sources',
                     priority=40,
                     size='medium',
                     content=self._operator_panel_content,
@@ -390,6 +391,15 @@ class SpotifyController:
         if vj is not None and hasattr(vj, 'unregister_now_playing'):
             try:
                 vj.unregister_now_playing('spotify')
+            except Exception:
+                pass
+        # Drop the Control Room panel too, so a mid-session shutdown doesn't
+        # leave a dead panel (error box) behind -- operator_panels.py
+        # "Lifecycle".
+        unregister = getattr(vj, 'unregister_operator_panel', None)
+        if callable(unregister):
+            try:
+                unregister('spotify')
             except Exception:
                 pass
 

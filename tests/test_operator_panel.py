@@ -35,7 +35,7 @@ def test_registration_call_registers_an_operator_panel(mock_app: MockApp) -> Non
     assert call is not None
     panel = call.args[0]
     assert isinstance(panel, OperatorPanel)
-    assert panel.name == 'spotify' and panel.title == 'Spotify' and panel.page == 'main'
+    assert panel.name == 'spotify' and panel.title == 'Spotify' and panel.page == 'sources'
     assert panel.content == controller._operator_panel_content
     assert panel.on_action == controller._operator_panel_action
     assert panel.tooltips == {
@@ -106,3 +106,11 @@ def test_action_logout_calls_logout(mock_app: MockApp) -> None:
 def test_action_unknown_returns_none(mock_app: MockApp) -> None:
     controller = _controller(mock_app)
     assert controller._operator_panel_action('bogus', None) is None
+
+
+def test_shutdown_unregisters_the_operator_panel(mock_app: MockApp) -> None:
+    """operator_panels.py "Lifecycle": a mid-session shutdown must not leave
+    a dead panel (error box) behind in the Control Room."""
+    controller = _controller(mock_app)
+    controller.shutdown()
+    mock_app.vj_api.unregister_operator_panel.assert_called_once_with('spotify')
