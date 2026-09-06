@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.6'
+__version__ = '1.0.0-rc.7'
 
 import base64
 import hashlib
@@ -659,9 +659,10 @@ class SpotifyController:
         if parts is None or len(parts) < 6:
             if self._available:
                 log.info('SpotifyController: player unavailable')
-            self._available = False
-            self._is_playing = False
-            self._status = 'stopped'
+            with self._state_lock:            # same discipline as the live branch
+                self._available = False
+                self._is_playing = False
+                self._status = 'stopped'
             return
 
         status = str(parts[0] or '').strip().lower()

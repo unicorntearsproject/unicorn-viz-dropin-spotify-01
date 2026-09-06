@@ -1,7 +1,7 @@
 # spotify-01
 
 Owner: Drop-in Maintainers
-Version: 1.0.0-rc.6
+Version: 1.0.0-rc.7
 Status: active
 Last updated: 2026-05-24
 
@@ -61,6 +61,7 @@ See `docs/troubleshooting.md`.
 
 ## Changelog
 
+- **1.0.0-rc.7** — The "player unavailable" branch of the local poll commits its state under the same lock as the live branch (2026-09-05 audit O5); unused test imports removed.
 - **1.0.0-rc.6** — The local playerctl poll (two subprocess spawns every
   0.75 s: metadata + position) runs on a `spotify-playerctl` worker instead
   of the render thread; the poll's results are committed under the state
