@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.7'
+__version__ = '1.0.0-rc.8'
 
 import base64
 import hashlib
@@ -84,6 +84,39 @@ class SpotifyController:
 
     Thread-safety: this controller is updated on the app's main thread only.
     """
+
+
+    # -- Config editor (core `c`, Performance tab) ---------------------------
+    # Every network / IPC cadence, live.  (label, attr, lo, hi, hint)
+    CONFIG_EDITOR_CATEGORY = 'Performance'
+    CONFIG_EDITOR_KEY = 'spotify'
+    CONFIG_EDITOR_TITLE = 'Spotify'
+    _CE_ROWS = (
+        ('poll_interval_s', 'Local poll', '_poll_interval_s', 0.15, 5.0,
+         'Seconds between local player (playerctl / D-Bus) polls'),
+        ('web_poll_interval_s', 'Web API poll', '_web_poll_interval_s', 1.0, 30.0,
+         'Seconds between Spotify Web API now-playing requests'),
+        ('web_poll_fallback_s', 'Web API fallback', '_web_poll_fallback_s', 10.0, 300.0,
+         'Slow safety poll that catches a missed track change'),
+        ('http_timeout_s', 'HTTP timeout', '_http_timeout_s', 0.5, 10.0,
+         'Per-request Web API timeout'),
+    )
+
+    def config_editor_settings(self) -> list[dict[str, object]]:
+        """Polling cadences and the HTTP timeout as slider rows."""
+        rows: list[dict[str, object]] = []
+        for name, label, attr, lo, hi, hint in self._CE_ROWS:
+            value = float(getattr(self, attr, lo))
+            rows.append({'name': name, 'label': label, 'value': value, 'min': lo,
+                         'max': hi, 'display': f'{value:.2f} s', 'hint': hint})
+        return rows
+
+    def set_config_setting(self, name: str, value: float) -> None:
+        """Apply a config-editor row live (clamped to the row's range)."""
+        for row_name, _label, attr, lo, hi, _hint in self._CE_ROWS:
+            if row_name == name:
+                setattr(self, attr, max(lo, min(hi, float(value))))
+                return
 
     def __init__(self, app: Any, cfg: dict[str, Any] | None = None) -> None:
         self._app = app
