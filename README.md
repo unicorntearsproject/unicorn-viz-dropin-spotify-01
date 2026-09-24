@@ -1,7 +1,7 @@
 # spotify-01
 
 Owner: Drop-in Maintainers
-Version: 1.0.0-rc.10
+Version: 1.0.0-rc.11
 Status: active
 Last updated: 2026-09-24
 
@@ -16,8 +16,6 @@ mode is the cross-platform path for queue, playlist, and auth-aware context.
 
 - Track metadata snapshot (`track_id`, title, artist, album, status)
 - Playback timing (`duration_s`, `position_s`, progress)
-- Optional per-track feature map from a local training corpus
-  (`bpm`, `energy`, `danceability`, `valence`)
 - Top-pinned now-playing banner for new tracks when enabled in config
 - Optional PKCE auth, playback context, queue, and playlist metadata via
 	Spotify Web API
@@ -61,6 +59,7 @@ See `docs/troubleshooting.md`.
 
 ## Changelog
 
+- **1.0.0-rc.11** — Everything training-related is gone: the **live corpus file** row and its `[spotify] live_corpus_file` key, the corpus writer (`record_live_corpus_snapshot`, retired since Auto VJ's sequence writer took over), its audio-feature extractor, and helpers left over from the July feature-map removal. Live training capture is Auto VJ's alone.
 - **1.0.0-rc.10** — The live corpus file row moves to the config editor's **Logging** tab.
 - **1.0.0-rc.9** — Config editor rows for the Web API **client ID** (masked, with SHOW) and the **live corpus file** path; both apply on the next launch and move a value set in config.toml into the menu (core 1.0.0-beta.172).
 - **1.0.0-rc.8** — Local poll, Web API poll, Web API fallback and HTTP timeout join the core config editor's Performance tab (live, remembered across runs by core).

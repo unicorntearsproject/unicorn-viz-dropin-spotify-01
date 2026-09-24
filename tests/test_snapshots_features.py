@@ -1,4 +1,4 @@
-"""Tests for Spotify snapshot generation and corpus path resolution."""
+"""Tests for Spotify snapshot generation."""
 from __future__ import annotations
 
 import sys
@@ -164,37 +164,3 @@ class TestSnapshot:
             assert controller.snapshot()['change_counter'] == 0  # nosec B101
             controller._change_counter = 5
             assert controller.snapshot()['change_counter'] == 5  # nosec B101
-
-
-class TestResolveCorpusPath:
-    """Test _resolve_features_path (used for live_corpus_file path resolution)."""
-
-    def test_resolve_features_path_none(self, mock_app: MockApp) -> None:
-        """Test path resolution with None."""
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, {})
-            result = controller._resolve_features_path(None)
-            assert result is None  # nosec B101
-
-    def test_resolve_features_path_empty_string(self, mock_app: MockApp) -> None:
-        """Test path resolution with empty string."""
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, {})
-            result = controller._resolve_features_path('')
-            assert result is None  # nosec B101
-
-    def test_resolve_features_path_absolute(self, mock_app: MockApp, tmp_path: Path) -> None:
-        """Test absolute path is preserved."""
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, {})
-            abs_path = tmp_path / 'corpus.jsonl'
-            result = controller._resolve_features_path(str(abs_path))
-            assert result == abs_path  # nosec B101
-
-    def test_resolve_features_path_relative(self, mock_app: MockApp) -> None:
-        """Test relative path is resolved to project root."""
-        with patch('sys.platform', 'linux'):
-            controller = SpotifyController(mock_app, {})
-            with patch('pathlib.Path.resolve'):
-                result = controller._resolve_features_path('corpus/live.jsonl')
-                assert result is not None  # nosec B101

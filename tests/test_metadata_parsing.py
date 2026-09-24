@@ -109,65 +109,6 @@ class TestTrackKey:
         assert key == 'artist name::song title'
 
 
-class TestNormalizeTags:
-    """Test _normalize_tags method."""
-
-    def test_normalize_tags_empty_list(self) -> None:
-        """Test empty list returns empty result."""
-        result = SpotifyController._normalize_tags([])
-        assert result == []
-
-    def test_normalize_tags_none(self) -> None:
-        """Test None returns empty result."""
-        result = SpotifyController._normalize_tags(None)
-        assert result == []
-
-    def test_normalize_tags_list_of_strings(self) -> None:
-        """Test list of strings is preserved and deduplicated."""
-        tags = ['electronic', 'dance', 'electronic']
-        result = SpotifyController._normalize_tags(tags)
-        assert result == ['electronic', 'dance']
-
-    def test_normalize_tags_string_comma_separated(self) -> None:
-        """Test comma-separated string is split."""
-        tags = 'electronic,dance,house'
-        result = SpotifyController._normalize_tags(tags)
-        assert len(result) == 3
-        assert 'electronic' in result
-
-    def test_normalize_tags_string_pipe_separated(self) -> None:
-        """Test pipe-separated string is split."""
-        tags = 'electronic|dance|house'
-        result = SpotifyController._normalize_tags(tags)
-        assert len(result) == 3
-        assert 'electronic' in result
-
-    def test_normalize_tags_mixed_separators(self) -> None:
-        """Test mixed comma and pipe separators."""
-        tags = 'electronic,dance|house'
-        result = SpotifyController._normalize_tags(tags)
-        assert len(result) == 3
-
-    def test_normalize_tags_deduplication_case_insensitive(self) -> None:
-        """Test deduplication is case-insensitive."""
-        tags = ['Electronic', 'electronic', 'ELECTRONIC']
-        result = SpotifyController._normalize_tags(tags)
-        assert result == ['electronic']
-
-    def test_normalize_tags_with_whitespace(self) -> None:
-        """Test whitespace is stripped."""
-        tags = ['  electronic  ', '  dance  ', '  house  ']
-        result = SpotifyController._normalize_tags(tags)
-        assert result == ['electronic', 'dance', 'house']
-
-    def test_normalize_tags_filters_empty(self) -> None:
-        """Test empty strings are filtered out."""
-        tags = 'electronic, , dance, , house'
-        result = SpotifyController._normalize_tags(tags)
-        assert '' not in result
-        assert len(result) == 3
-
-
 class TestSafeFloat:
     """Test _safe_float method."""
 

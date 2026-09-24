@@ -2,7 +2,7 @@
 
 Owner: Drop-in Maintainers
 Status: active
-Last updated: 2026-06-18
+Last updated: 2026-09-24
 
 ```toml
 [spotify]
@@ -54,49 +54,9 @@ resolve_playlist_context = true
 - `web_api.resolve_queue`: Enables `/me/player/queue` polling.
 - `web_api.resolve_playlist_context`: Enables playlist detail lookups.
 
-Accepted feature keys are canonicalized automatically. Use either:
-
-- `spotify:track:<id>`
-- `/com/spotify/track/<id>` from MPRIS/playerctl
-- `https://open.spotify.com/track/<id>`
-
-## Optional Features File Format
-
-```json
-{
-  "spotify:track:2TpxZ7JUBn3uw46aR7qd6V": {
-    "bpm": 128,
-    "energy": 0.82,
-    "danceability": 0.71,
-    "valence": 0.64,
-    "confidence": 0.90,
-    "tags": ["house", "peak-time"],
-    "genres": ["electronic", "dance"],
-    "tag_confidence": 0.85
-  }
-}
-```
-
-## Live Corpus
-
-The optional live corpus sink writes runtime rows directly when
-`[spotify].live_corpus_file` is configured. This is the path to use if you
-want training data while a set is running.
-
-For Auto VJ training, the usual path is:
-
-1. Capture Auto VJ logs with Spotify metadata enabled.
-2. Resolve each Spotify track id against a local audio catalog.
-3. Run `tools/training/sync_corpus_from_logs.py` to extract Essentia features
-  into the corpus.
-4. Train or refresh the weight file from that corpus.
-
-If you want the corpus to keep filling while a set is running, configure
-`[spotify].live_corpus_file` and keep the local audio catalog mounted.
-
-The logs can carry Spotify title/artist/album/source fields, which helps the
-training sync resolve tracks even when the catalog is keyed by metadata rather
-than track id.
+Spotify carries nothing training-related: live training capture belongs to
+Auto VJ's own corpus writers (see training-kit-01), configured on the config
+editor's Logging tab.
 
 The live Spotify runtime no longer depends on Spotify's deprecated audio-
 features endpoints.

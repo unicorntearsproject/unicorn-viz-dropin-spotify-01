@@ -34,7 +34,7 @@ def test_rows_and_clamped_setters() -> None:
     c = _ctrl()
     rows = {r['name']: r for r in c.config_editor_settings()}
     assert list(rows) == ['poll_interval_s', 'web_poll_interval_s', 'web_poll_fallback_s',
-                          'http_timeout_s', 'client_id', 'live_corpus_file']
+                          'http_timeout_s', 'client_id']
     assert rows['web_poll_interval_s']['display'] == '3.00 s'
     assert all(r['hint'] and r['label'] for r in rows.values())
     c.set_config_setting('poll_interval_s', 0.01)
@@ -52,10 +52,11 @@ def test_startup_only_rows_return_their_overrides() -> None:
     assert rows['client_id']['kind'] == 'secret' and rows['client_id']['restart'] == 'spotify'
     assert rows['client_id']['config'] == 'spotify.web_api.client_id'
     assert c.set_config_setting('client_id', ' abc ') == {'web_api.client_id': 'abc'}
-    assert c.set_config_setting('live_corpus_file', 'x.jsonl') == {'live_corpus_file': 'x.jsonl'}
 
 
-def test_corpus_file_row_sits_on_the_logging_tab() -> None:
-    rows = {r['name']: r for r in _ctrl().config_editor_settings()}
-    assert rows['live_corpus_file']['tab'] == 'Logging'
-    assert 'tab' not in rows['client_id']
+def test_no_training_or_corpus_rows() -> None:
+    """Spotify carries nothing training-related (removed in rc.11)."""
+    rows = {r['name'] for r in _ctrl().config_editor_settings()}
+    assert not any('corpus' in n or 'train' in n for n in rows)
+    assert _ctrl().set_config_setting('live_corpus_file', 'x.jsonl') is None
+
