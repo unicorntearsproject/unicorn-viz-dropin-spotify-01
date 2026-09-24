@@ -25,13 +25,16 @@ def _ctrl():
     c._web_poll_interval_s = 3.0
     c._web_poll_fallback_s = 60.0
     c._http_timeout_s = 2.0
+    c._client_id = ''
+    c._cfg = {}
     return c
 
 
 def test_rows_and_clamped_setters() -> None:
     c = _ctrl()
     rows = {r['name']: r for r in c.config_editor_settings()}
-    assert list(rows) == ['poll_interval_s', 'web_poll_interval_s', 'web_poll_fallback_s', 'http_timeout_s']
+    assert list(rows) == ['poll_interval_s', 'web_poll_interval_s', 'web_poll_fallback_s',
+                          'http_timeout_s', 'client_id', 'live_corpus_file']
     assert rows['web_poll_interval_s']['display'] == '3.00 s'
     assert all(r['hint'] and r['label'] for r in rows.values())
     c.set_config_setting('poll_interval_s', 0.01)
@@ -41,3 +44,12 @@ def test_rows_and_clamped_setters() -> None:
     c.set_config_setting('http_timeout_s', 99.0)
     assert c._http_timeout_s == 10.0
     c.set_config_setting('unknown', 1.0)  # ignored
+
+
+def test_startup_only_rows_return_their_overrides() -> None:
+    c = _ctrl()
+    rows = {r['name']: r for r in c.config_editor_settings()}
+    assert rows['client_id']['kind'] == 'secret' and rows['client_id']['restart'] == 'spotify'
+    assert rows['client_id']['config'] == 'spotify.web_api.client_id'
+    assert c.set_config_setting('client_id', ' abc ') == {'web_api.client_id': 'abc'}
+    assert c.set_config_setting('live_corpus_file', 'x.jsonl') == {'live_corpus_file': 'x.jsonl'}

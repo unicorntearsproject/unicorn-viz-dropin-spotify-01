@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.8'
+__version__ = '1.0.0-rc.9'
 
 import base64
 import hashlib
@@ -109,10 +109,26 @@ class SpotifyController:
             value = float(getattr(self, attr, lo))
             rows.append({'name': name, 'label': label, 'value': value, 'min': lo,
                          'max': hi, 'display': f'{value:.2f} s', 'hint': hint})
+        # Both read at startup, so they apply on the next launch.  The client
+        # id is an app credential: masked, with SHOW.
+        rows.append({'name': 'client_id', 'label': 'Web API client ID', 'kind': 'secret',
+                     'value': self._client_id, 'restart': 'spotify',
+                     'config': 'spotify.web_api.client_id',
+                     'hint': 'Your Spotify app client ID (PKCE, no secret needed)'})
+        rows.append({'name': 'live_corpus_file', 'label': 'Live corpus file', 'kind': 'text',
+                     'value': str(self._cfg.get('live_corpus_file') or ''),
+                     'restart': 'spotify', 'config': 'spotify.live_corpus_file',
+                     'placeholder': '(off)',
+                     'hint': 'JSONL file for per-track feature logging (empty = off)'})
         return rows
 
-    def set_config_setting(self, name: str, value: float) -> None:
-        """Apply a config-editor row live (clamped to the row's range)."""
+    def set_config_setting(self, name: str, value: float | str) -> dict[str, object] | None:
+        """Apply a config-editor row live (clamped to the row's range); the
+        startup-only rows return their override for the next launch."""
+        if name == 'client_id':
+            return {'web_api.client_id': str(value).strip()}
+        if name == 'live_corpus_file':
+            return {'live_corpus_file': str(value).strip()}
         for row_name, _label, attr, lo, hi, _hint in self._CE_ROWS:
             if row_name == name:
                 setattr(self, attr, max(lo, min(hi, float(value))))
