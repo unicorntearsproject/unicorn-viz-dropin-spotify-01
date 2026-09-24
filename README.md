@@ -1,7 +1,7 @@
 # spotify-01
 
 Owner: Drop-in Maintainers
-Version: 1.0.0-rc.9
+Version: 1.0.0-rc.10
 Status: active
 Last updated: 2026-09-24
 
@@ -61,6 +61,7 @@ See `docs/troubleshooting.md`.
 
 ## Changelog
 
+- **1.0.0-rc.10** — The live corpus file row moves to the config editor's **Logging** tab.
 - **1.0.0-rc.9** — Config editor rows for the Web API **client ID** (masked, with SHOW) and the **live corpus file** path; both apply on the next launch and move a value set in config.toml into the menu (core 1.0.0-beta.172).
 - **1.0.0-rc.8** — Local poll, Web API poll, Web API fallback and HTTP timeout join the core config editor's Performance tab (live, remembered across runs by core).
 - **1.0.0-rc.7** — The "player unavailable" branch of the local poll commits its state under the same lock as the live branch (2026-09-05 audit O5); unused test imports removed.

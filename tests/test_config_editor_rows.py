@@ -53,3 +53,9 @@ def test_startup_only_rows_return_their_overrides() -> None:
     assert rows['client_id']['config'] == 'spotify.web_api.client_id'
     assert c.set_config_setting('client_id', ' abc ') == {'web_api.client_id': 'abc'}
     assert c.set_config_setting('live_corpus_file', 'x.jsonl') == {'live_corpus_file': 'x.jsonl'}
+
+
+def test_corpus_file_row_sits_on_the_logging_tab() -> None:
+    rows = {r['name']: r for r in _ctrl().config_editor_settings()}
+    assert rows['live_corpus_file']['tab'] == 'Logging'
+    assert 'tab' not in rows['client_id']

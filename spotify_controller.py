@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.9'
+__version__ = '1.0.0-rc.10'
 
 import base64
 import hashlib
@@ -118,7 +118,7 @@ class SpotifyController:
         rows.append({'name': 'live_corpus_file', 'label': 'Live corpus file', 'kind': 'text',
                      'value': str(self._cfg.get('live_corpus_file') or ''),
                      'restart': 'spotify', 'config': 'spotify.live_corpus_file',
-                     'placeholder': '(off)',
+                     'placeholder': '(off)', 'tab': 'Logging', 'section': 'Spotify',
                      'hint': 'JSONL file for per-track feature logging (empty = off)'})
         return rows
 
