@@ -6,7 +6,7 @@ playlist-awareness.
 """
 from __future__ import annotations
 
-__version__ = '1.0.0-rc.11'
+__version__ = '1.0.0-rc.12'
 
 import base64
 import hashlib
@@ -87,7 +87,7 @@ class SpotifyController:
 
     # -- Config editor (core `c`, Performance tab) ---------------------------
     # Every network / IPC cadence, live.  (label, attr, lo, hi, hint)
-    CONFIG_EDITOR_CATEGORY = 'Performance'
+    CONFIG_EDITOR_CATEGORY = 'System'
     CONFIG_EDITOR_KEY = 'spotify'
     CONFIG_EDITOR_TITLE = 'Spotify'
     _CE_ROWS = (

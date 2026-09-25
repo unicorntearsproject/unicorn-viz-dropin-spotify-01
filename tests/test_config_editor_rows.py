@@ -60,3 +60,7 @@ def test_no_training_or_corpus_rows() -> None:
     assert not any('corpus' in n or 'train' in n for n in rows)
     assert _ctrl().set_config_setting('live_corpus_file', 'x.jsonl') is None
 
+
+
+def test_rows_live_on_the_system_tab() -> None:
+    assert _mod.SpotifyController.CONFIG_EDITOR_CATEGORY == 'System'

@@ -1,7 +1,7 @@
 # spotify-01
 
 Owner: Drop-in Maintainers
-Version: 1.0.0-rc.11
+Version: 1.0.0-rc.12
 Status: active
 Last updated: 2026-09-24
 
@@ -59,6 +59,7 @@ See `docs/troubleshooting.md`.
 
 ## Changelog
 
+- **1.0.0-rc.12** — The **Web API client ID** row moves to the config editor's new **System** tab (off Performance).
 - **1.0.0-rc.11** — Everything training-related is gone: the **live corpus file** row and its `[spotify] live_corpus_file` key, the corpus writer (`record_live_corpus_snapshot`, retired since Auto VJ's sequence writer took over), its audio-feature extractor, and helpers left over from the July feature-map removal. Live training capture is Auto VJ's alone.
 - **1.0.0-rc.10** — The live corpus file row moves to the config editor's **Logging** tab.
 - **1.0.0-rc.9** — Config editor rows for the Web API **client ID** (masked, with SHOW) and the **live corpus file** path; both apply on the next launch and move a value set in config.toml into the menu (core 1.0.0-beta.172).
